@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+experiment_run.log
+papers/*.pdf
+data/raw_papers/*.pdf
