@@ -21,7 +21,7 @@ def search(
     piece_tokens: int = 200,
     overlap: int = 40,
     absence_threshold: Optional[float] = None,  # Parameter: default None per brief. Do not set a value.
-    rerank: str = "none",                       # Parameter: "none" for now, TODO for later.
+    rerank: str = "none",                       # Reranking method ("none" or "term_overlap")
 ) -> List[SearchResult]:
     """Retrieve top-k chunks from the cached BM25 index."""
     bm25, chunks = get_or_build_index(piece_tokens=piece_tokens, overlap=overlap)
@@ -43,9 +43,15 @@ def search(
 
         results.append(SearchResult(chunk=chunks[idx], score=round(score_val, 4), rank=rank))
 
-    # TODO: Implement re-ranking when rerank != "none"
-    if rerank != "none":
-        pass
+    if rerank == "term_overlap":
+        query_set = set(query_tokens)
+        for r in results:
+            chunk_tokens = set(tokenize_text(r.chunk.text))
+            coverage = len(query_set.intersection(chunk_tokens)) / max(1, len(query_set))
+            r.score = round(r.score * (1.0 + 0.25 * coverage), 4)
+        results.sort(key=lambda x: x.score, reverse=True)
+        for i, r in enumerate(results, start=1):
+            r.rank = i
 
     return results
 

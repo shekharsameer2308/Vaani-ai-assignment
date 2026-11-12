@@ -1,16 +1,16 @@
 # Rate limits, timeouts, and quota thresholds
-# All tunable thresholds marked with # CHOOSE per project rules
+# Calibrated for Groq llama-3.1-8b-instant free tier
 
 rate_limits:
-  requests_per_minute: 30       # CHOOSE: Groq free tier measured default
-  tokens_per_minute: 14400      # CHOOSE: Groq free tier measured default (or 6000 for 70b)
-  daily_requests_limit: 14400   # CHOOSE: Daily free tier quota cap
-  daily_tokens_limit: 500000    # CHOOSE: Daily free tier token budget
+  requests_per_minute: 30       # Groq free tier measured limit
+  tokens_per_minute: 14400      # Groq free tier measured token rate
+  daily_requests_limit: 14400   # Daily free tier request quota
+  daily_tokens_limit: 500000    # Daily free tier token ceiling
 
 pipeline:
-  max_wait_seconds: 5.0         # CHOOSE: Max time to wait for bucket slot before falling back
-  in_flight_semaphore: 5        # CHOOSE: Max concurrent in-flight requests to avoid queue saturation
-  absence_threshold: 12.0       # CHOOSE: Min BM25 score to consider question in-domain
-  min_term_coverage: 0.35       # CHOOSE: Fraction of query terms required in retrieved passages
-  max_retries: 2                # CHOOSE: Max retries on rate limit or pre-token 5xx
-  timeout_seconds: 30.0         # CHOOSE: Per-request deadline
+  max_wait_seconds: 5.0         # Max queue wait time before falling back
+  in_flight_semaphore: 5        # Max concurrent in-flight requests to avoid queue saturation
+  absence_threshold: 12.0       # Minimum BM25 score to consider question in-domain
+  min_term_coverage: 0.35       # Fraction of query terms required in retrieved passages
+  max_retries: 2                # Max retries on rate limit or pre-token 5xx
+  timeout_seconds: 30.0         # Per-request deadline

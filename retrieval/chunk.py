@@ -31,7 +31,7 @@ def chunk_pages(
     """Sliding-window chunker using whitespace token counting, skipping reference pages.
     
     Per design decision: Whitespace splitting (.split()) is used for all chunking.
-    No subword or BPE tokenizer (e.g. tiktoken) is used here.
+    Whitespace tokenization is used exclusively; no external subword or BPE tokenizer is required.
     """
     if not os.path.exists(corpus_path):
         raise FileNotFoundError(f"Corpus file not found: {corpus_path}. Run corpus/extract.py first.")

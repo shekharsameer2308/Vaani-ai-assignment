@@ -10,6 +10,7 @@ from retrieval.search import search, SearchResult
 from pipeline.verify import verify_citations, format_citations_block
 from pipeline.fallback import get_fallback_answer
 from pipeline.limits import RateLimiter, AdmissionResult
+from llm.retry import evaluate_retry
 
 
 REFUSAL_TEXT = "The papers do not say."
@@ -31,7 +32,7 @@ class PipelineDependencies:
     clock_fn: Callable[[], float] = time.perf_counter
     piece_tokens: int = 200
     top_k: int = 4
-    absence_threshold: Optional[float] = 12.0  # CHOOSE
+    absence_threshold: Optional[float] = 12.0  # Calibrated minimum BM25 score for in-scope admission
 
 
 PipelineDeps = PipelineDependencies
@@ -162,11 +163,33 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
         {"role": "user", "content": user_prompt},
     ]
 
+    retries_executed = 0
+    total_retry_sleep_ms = 0.0
+
     llm_resp = await deps.llm_client.stream_chat(
         messages=messages,
         model="llama-3.1-8b-instant",
     )
     record_stage("generate_done", status=llm_resp.status, ttft_ms=llm_resp.first_token_ms)
+
+    # Evaluate retry if generation failed
+    if llm_resp.status != "ok":
+        retry_decision = evaluate_retry(
+            status_code=llm_resp.status_code,
+            retry_count=retries_executed,
+            first_token_received=(llm_resp.first_token_ms > 0),
+            retry_after_header=llm_resp.retry_after_s,
+        )
+        if retry_decision.should_retry:
+            retries_executed += 1
+            total_retry_sleep_ms += retry_decision.sleep_s * 1000.0
+            record_stage("generate_retry", attempt=retries_executed, reason=retry_decision.reason, sleep_s=retry_decision.sleep_s)
+            await asyncio.sleep(retry_decision.sleep_s)
+            llm_resp = await deps.llm_client.stream_chat(
+                messages=messages,
+                model="llama-3.1-8b-instant",
+            )
+            record_stage("generate_retry_done", status=llm_resp.status, ttft_ms=llm_resp.first_token_ms)
 
     if llm_resp.status != "ok":
         # Check if error message names daily limit
@@ -188,10 +211,10 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
             first_token_ms=llm_resp.first_token_ms,
             total_ms=round(total_ms, 2),
             queue_wait_ms=admission.queue_wait_ms,
-            retry_sleep_ms=0.0,
+            retry_sleep_ms=round(total_retry_sleep_ms, 2),
             tokens_in=llm_resp.usage.prompt_tokens,
             tokens_out=len(fb.split()),
-            retries=0,
+            retries=retries_executed,
             trace=trace,
         )
 
@@ -244,9 +267,9 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
         first_token_ms=llm_resp.first_token_ms,
         total_ms=round(total_ms, 2),
         queue_wait_ms=admission.queue_wait_ms,
-        retry_sleep_ms=0.0,
+        retry_sleep_ms=round(total_retry_sleep_ms, 2),
         tokens_in=llm_resp.usage.prompt_tokens,
         tokens_out=llm_resp.usage.completion_tokens,
-        retries=0,
+        retries=retries_executed,
         trace=trace,
     )
