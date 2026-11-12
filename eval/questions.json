@@ -1,0 +1,107 @@
+[
+  {
+    "id": "q01_attention_formula",
+    "question": "What is the exact mathematical formula for Scaled Dot-Product Attention in the Transformer?",
+    "gold_paper": "1706.03762v7",
+    "gold_page": [3, 4],
+    "kind": "answerable"
+  },
+  {
+    "id": "q02_transformer_layers",
+    "question": "How many layers are in the encoder and decoder stacks of the base Transformer, and what is d_model?",
+    "gold_paper": "1706.03762v7",
+    "gold_page": [2, 3],
+    "kind": "answerable"
+  },
+  {
+    "id": "q03_positional_encoding",
+    "question": "What sinusoidal functions are used for positional encoding in the Transformer and why were they chosen over learned embeddings?",
+    "gold_paper": "1706.03762v7",
+    "gold_page": [5, 6],
+    "kind": "answerable"
+  },
+  {
+    "id": "q04_moshi_latency",
+    "question": "What is the theoretical and practical conversational latency of Moshi?",
+    "gold_paper": "2410.00037v1",
+    "gold_page": [1, 2, 26],
+    "kind": "answerable"
+  },
+  {
+    "id": "q05_mimi_codec",
+    "question": "What is Mimi's audio sampling rate, frame rate, number of RVQ quantizers, and bitrate?",
+    "gold_paper": "2410.00037v1",
+    "gold_page": [4, 10, 11],
+    "kind": "answerable"
+  },
+  {
+    "id": "q06_inner_monologue",
+    "question": "How does Inner Monologue in Moshi align text and audio tokens, and what role do PAD and EPAD tokens play?",
+    "gold_paper": "2410.00037v1",
+    "gold_page": [3, 5, 6, 7],
+    "kind": "answerable"
+  },
+  {
+    "id": "q07_dynamic_chunking_routing",
+    "question": "How does the routing module in Dynamic Chunking predict chunk boundaries using cosine similarity?",
+    "gold_paper": "2507.07955v2",
+    "gold_page": [4, 6, 17],
+    "kind": "answerable"
+  },
+  {
+    "id": "q08_smoothing_module_ema",
+    "question": "Why is the smoothing module necessary in H-Net dechunking and how does it use exponential moving average?",
+    "gold_paper": "2507.07955v2",
+    "gold_page": [4, 7],
+    "kind": "answerable"
+  },
+  {
+    "id": "q09_ratio_loss",
+    "question": "What is the ratio loss equation L_ratio in Dynamic Chunking and what is the weight alpha used during training?",
+    "gold_paper": "2507.07955v2",
+    "gold_page": [5, 8],
+    "kind": "answerable"
+  },
+  {
+    "id": "q10_subtle_tpu_training",
+    "question": "What learning rate schedule was used when training Dynamic Chunking on Google Cloud TPU v5e pods?",
+    "gold_paper": "2507.07955v2",
+    "gold_page": null,
+    "kind": "unanswerable_subtle"
+  },
+  {
+    "id": "q11_subtle_moshi_wmt",
+    "question": "What was the BLEU score of Moshi on the WMT 2014 English-to-German translation benchmark?",
+    "gold_paper": "2410.00037v1",
+    "gold_page": null,
+    "kind": "unanswerable_subtle"
+  },
+  {
+    "id": "q12_quantum_surface_codes",
+    "question": "What is the fault-tolerant threshold theorem for surface codes in superconducting topological quantum memory?",
+    "gold_paper": null,
+    "gold_page": null,
+    "kind": "unanswerable_out_of_corpus"
+  },
+  {
+    "id": "q13_rlhf_direct_preference_opt",
+    "question": "How does Direct Preference Optimization (DPO) derive the implicit reward function from the Bradley-Terry preference model?",
+    "gold_paper": null,
+    "gold_page": null,
+    "kind": "unanswerable_out_of_corpus"
+  },
+  {
+    "id": "q14_bitnet_ternary_quantization",
+    "question": "What is the Absmean quantization function used for 1.58-bit ternary weights in BitNet b1.58?",
+    "gold_paper": null,
+    "gold_page": null,
+    "kind": "unanswerable_out_of_corpus"
+  },
+  {
+    "id": "q15_llama3_rope_scaling",
+    "question": "What is the maximum token context length supported by Llama-3-70B using RoPE scaling?",
+    "gold_paper": null,
+    "gold_page": null,
+    "kind": "unanswerable_out_of_corpus"
+  }
+]

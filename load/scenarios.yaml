@@ -1,0 +1,50 @@
+# Load testing scenarios configuration
+# Defines arrival patterns, load shaping, and limit conditions
+
+steady:
+  description: "Constant arrival rate comfortably within free-tier limits"
+  duration_seconds: 10
+  rate_rps: 1.0
+  arrival_pattern: "poisson"
+  rpm_limit: 30
+  tpm_limit: 14400
+  exhaust_daily: false
+
+burst:
+  description: "Step-function spike to 3x rate limit to test queueing and backpressure"
+  duration_seconds: 12
+  warmup_seconds: 3
+  spike_rate_rps: 3.0
+  cooldown_seconds: 3
+  arrival_pattern: "step"
+  rpm_limit: 30
+  tpm_limit: 14400
+  exhaust_daily: false
+
+sustained_overload:
+  description: "Persistent 1.5x rate limit overload across the entire test run"
+  duration_seconds: 10
+  rate_rps: 2.0
+  arrival_pattern: "poisson"
+  rpm_limit: 30
+  tpm_limit: 14400
+  exhaust_daily: false
+
+rpm_halved:
+  description: "Sudden mid-test capacity reduction from 30 RPM to 15 RPM"
+  duration_seconds: 10
+  rate_rps: 1.2
+  drop_at_seconds: 5
+  initial_rpm_limit: 30
+  halved_rpm_limit: 15
+  arrival_pattern: "fixed"
+  exhaust_daily: false
+
+daily_exhausted:
+  description: "Starts near daily token/request budget and trips the daily circuit breaker"
+  duration_seconds: 8
+  rate_rps: 1.5
+  arrival_pattern: "fixed"
+  rpm_limit: 30
+  tpm_limit: 14400
+  exhaust_daily: true

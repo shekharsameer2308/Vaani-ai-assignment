@@ -1,0 +1,10 @@
+# Pricing configuration for model cost calculation
+# Groq free tier is $0.00; standard cloud provider reference pricing for 8B models included
+
+models:
+  llama-3.1-8b-instant:
+    input_cost_per_million_tokens: 0.05    # Free tier actual is 0.0, paid reference is $0.05
+    output_cost_per_million_tokens: 0.08   # Free tier actual is 0.0, paid reference is $0.08
+    is_free_tier: true
+
+pricing_mode: free_tier  # Options: free_tier, paid_reference

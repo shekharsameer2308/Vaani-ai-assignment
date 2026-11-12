@@ -1,0 +1,30 @@
+# Stand-in model service configuration
+# Reproduces Groq API behavior with lognormal TTFT, load curve, token buckets, and fault injection
+
+ttft_distribution:
+  mu: 5.25            # CHOOSE: log(ms) mean (~190ms median)
+  sigma: 0.35         # CHOOSE: log(ms) standard deviation
+
+generation:
+  tokens_per_second: 240.0  # CHOOSE: token streaming speed in tokens/s
+
+rate_limits:
+  requests_per_minute: 30       # CHOOSE: matches discovered Groq limits
+  tokens_per_minute: 14400      # CHOOSE: matches discovered Groq limits
+  daily_requests_limit: 14400   # CHOOSE: daily request ceiling
+  daily_tokens_limit: 500000    # CHOOSE: daily token ceiling
+
+load_curve:
+  knee: 4             # CHOOSE: in-flight knee threshold before progressive queue slowdown
+  alpha: 0.25         # CHOOSE: slowdown multiplier
+  beta: 1.5           # CHOOSE: slowdown non-linear exponent
+
+fault_injection:
+  p_drop: 0.00        # CHOOSE: simulated socket drops
+  p_500: 0.01         # CHOOSE: simulated transient 500 errors
+  p_slowdown: 0.05    # CHOOSE: simulated sudden tail latency spike (3x)
+  p_rate_limit: 0.00  # CHOOSE: explicit manual 429 injection
+
+simulation:
+  time_dilation: 0.05 # CHOOSE: accelerated simulation for fast reproducible runs
+  seed: 42            # CHOOSE: deterministic random seed for test reproducibility

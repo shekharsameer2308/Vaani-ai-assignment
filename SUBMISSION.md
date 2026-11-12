@@ -7,12 +7,12 @@ We built a resilient, 4-step retrieval-augmented assistant in Python designed to
 - "Dynamic Chunking for End-to-End Hierarchical Sequence Modeling" (arXiv:2507.07955v2)
 
 ### Architecture
-1. **Step 1: Normalization & Filter Decomposition**: Cleans input queries, extracts domain terminology, and detects paper filter candidates.
-2. **Step 2: Retrieval Tool Call (`retrieve_passages`)**: Invokes parameterized search over sliding-window text chunks with section and page tracking.
-3. **Step 3: Grounding Gate & Decision Branch / Refinement Loop**: Evaluates query term coverage and cross-match confidence. If confidence is below threshold, executes an iterative refinement loop before branching to an explicit refusal if the topic is not covered in the library.
-4. **Step 4: Grounded Synthesis & Exact Citation Validation**: Synthesizes the response strictly from retrieved passages, appending verified passage citations `[Title (arXiv:ID), p. X, Sec. Y]`.
+1. **Admit Stage (`pipeline/limits.py`)**: Checks in-memory cache and evaluates token-bucket capacity (30 RPM, 14,400 TPM, daily token/request ceilings) and concurrency semaphore before admitting requests. If throttled, degrades to extractive fallback or cache rather than failing unhandled.
+2. **Retrieve Stage (`retrieval/search.py`)**: Executes BM25 search over sliding-window whitespace text chunks (`retrieval/chunk.py`, `retrieval/index.py`). Evaluates absence threshold; if no passage passes threshold, immediately refuses with `"The papers do not say."` without making an expensive or quota-consuming model call.
+3. **Generate Stage (`pipeline/pipeline.py` & `llm/client.py`)**: Injects retrieved passages formatted with labeled tags `[P1]..[Pk]`. Streams response using a shared process-wide `httpx.AsyncClient` (or calibrated `standin/app.py`). Accurately measures Time-to-First-Token (TTFT) and total latency.
+4. **Verify & Repair Stage (`pipeline/verify.py`)**: Verifies that every cited passage tag exists in the retrieved set. If citations are missing or cite unretrieved passages, triggers a single targeted repair loop. If repair fails, refuses rather than hallucinating facts.
 
-**The single decision that shaped the system most:** Decoupling the grounding decision from generative model completion. Rather than allowing the LLM to inspect retrieved text and guess whether it contains enough facts, our system implements an explicit gate before LLM dispatch. If query term coverage and relevance fail the grounding threshold, the pipeline branches immediately to refusal without making an expensive or rate-consuming model call.
+**The single decision that shaped the system most:** Decoupling the grounding decision from generative model completion. Rather than allowing the LLM to inspect retrieved text and guess whether it contains enough facts, our system implements an explicit gate before LLM dispatch. If query term coverage and BM25 relevance fail the grounding threshold, the pipeline branches immediately to refusal without making an expensive or rate-consuming model call.
 
 ---
 
