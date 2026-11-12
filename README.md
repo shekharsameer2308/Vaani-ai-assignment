@@ -18,8 +18,8 @@ Follow these steps to set up the environment, verify the papers, build the retri
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/the-relay.git
-cd the-relay
+git clone https://github.com/shekharsameer2308/Vaani-ai-assignment.git
+cd Vaani-ai-assignment
 
 # 2. Create and activate a Python virtual environment
 python3 -m venv .venv
@@ -181,3 +181,4 @@ The dense 2-page technical write-up required by the brief is located at [`SUBMIS
 8. What the person sees during quota exhaustion
 9. Unsure assumptions, omissions, and conceptual takeaways (e.g., Moshi Inner Monologue)
 10. Feedback on Vaani and collaboration methodology
+
