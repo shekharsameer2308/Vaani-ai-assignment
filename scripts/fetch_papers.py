@@ -55,17 +55,25 @@ def download(paper_id, meta, out_dir):
         print(f"  ERROR: requests not installed, cannot download {paper_id}")
         sys.exit(1)
 
-    headers = {"User-Agent": "TheRelayRAG/1.0 (academic research project)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     print(f"  Downloading {meta['url']} ...")
-    resp = requests.get(meta["url"], headers=headers, timeout=60, stream=True)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(meta["url"], headers=headers, timeout=60, stream=True)
+        resp.raise_for_status()
 
-    with open(path, "wb") as f:
-        for chunk in resp.iter_content(65536):
-            f.write(chunk)
+        with open(path, "wb") as f:
+            for chunk in resp.iter_content(65536):
+                f.write(chunk)
 
-    print(f"  Saved {path} ({os.path.getsize(path)} bytes)")
-    return path
+        print(f"  Saved {path} ({os.path.getsize(path)} bytes)")
+        return path
+    except Exception as e:
+        print(f"  ERROR: Unable to download from {meta['url']}: {e}")
+        print(f"  If running in an offline environment or blocked by arXiv edge rate-limits,")
+        print(f"  place '{meta['filename']}' directly into '{out_dir}/' and re-run.")
+        sys.exit(1)
 
 
 def build_manifest(out_dir):
