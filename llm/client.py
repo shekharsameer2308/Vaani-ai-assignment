@@ -9,6 +9,7 @@ from typing import AsyncIterator, Dict, Optional, Tuple
 import httpx
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+XAI_BASE_URL = "https://api.x.ai/v1"
 
 
 @dataclass
@@ -33,16 +34,33 @@ class StreamResponse:
 
 
 class GroqAsyncClient:
-    """Shared async client for Groq API."""
+    """Shared async client for Groq and OpenAI-compatible providers (including xAI Grok)."""
 
-    def __init__(self, api_key: Optional[str] = None, client: Optional[httpx.AsyncClient] = None):
-        self.api_key = api_key or os.getenv("GROQ_API_KEY", "")
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        client: Optional[httpx.AsyncClient] = None,
+    ):
+        xai_key = os.getenv("XAI_API_KEY", "")
+        groq_key = os.getenv("GROQ_API_KEY", "")
+
+        if api_key:
+            self.api_key = api_key
+            self.base_url = base_url or (XAI_BASE_URL if api_key.startswith("xai-") else GROQ_BASE_URL)
+        elif xai_key:
+            self.api_key = xai_key
+            self.base_url = base_url or XAI_BASE_URL
+        else:
+            self.api_key = groq_key
+            self.base_url = base_url or GROQ_BASE_URL
+
         self._external_client = client is not None
         self._client = client
 
     async def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(base_url=GROQ_BASE_URL, timeout=30.0)
+            self._client = httpx.AsyncClient(base_url=self.base_url, timeout=30.0)
         return self._client
 
     async def close(self):

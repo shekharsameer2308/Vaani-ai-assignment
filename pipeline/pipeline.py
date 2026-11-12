@@ -166,9 +166,16 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
     retries_executed = 0
     total_retry_sleep_ms = 0.0
 
+    model_name = getattr(deps.llm_client, "default_model", None)
+    if not model_name:
+        if getattr(deps.llm_client, "base_url", "").startswith("https://api.x.ai"):
+            model_name = "grok-beta"
+        else:
+            model_name = "llama-3.1-8b-instant"
+
     llm_resp = await deps.llm_client.stream_chat(
         messages=messages,
-        model="llama-3.1-8b-instant",
+        model=model_name,
     )
     record_stage("generate_done", status=llm_resp.status, ttft_ms=llm_resp.first_token_ms)
 
@@ -237,7 +244,7 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
                 "content": f"Your response had citation errors ({ver.reason}). Rewrite your answer ensuring every claim cites a valid [P1]..[Pk] tag or say 'The papers do not say.'",
             },
         ]
-        repair_resp = await deps.llm_client.stream_chat(messages=repair_messages, model="llama-3.1-8b-instant")
+        repair_resp = await deps.llm_client.stream_chat(messages=repair_messages, model=model_name)
         if repair_resp.status == "ok":
             repair_ver = verify_citations(repair_resp.content.strip(), retrieved_chunks)
             if repair_ver.is_valid:
