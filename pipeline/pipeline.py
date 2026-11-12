@@ -280,3 +280,50 @@ async def answer(question: str, deps: PipelineDependencies) -> Result:
         retries=retries_executed,
         trace=trace,
     )
+
+
+async def cli_main():
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="Ask a question over the paper library")
+    parser.add_argument("question", type=str, help="Question to ask")
+    parser.add_argument("--k", type=int, default=3, help="Number of passages to retrieve")
+    parser.add_argument("--piece", type=int, default=200, help="Chunk whitespace token size")
+    args = parser.parse_args()
+
+    # Auto-detect client: Groq / xAI if keys exist, otherwise StandIn
+    if os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY"):
+        from llm.client import GroqAsyncClient
+        client = GroqAsyncClient()
+        source_name = "Live API (Groq/xAI)"
+    else:
+        from standin.app import StandInLLMClient
+        client = StandInLLMClient()
+        source_name = "Calibrated Stand-in"
+
+    limiter = RateLimiter()
+    deps = PipelineDependencies(
+        retriever_fn=search,
+        llm_client=client,
+        limiter=limiter,
+        top_k=args.k,
+        piece_tokens=args.piece,
+    )
+
+    print(f"\n[Provider: {source_name}]")
+    print(f"Query: {args.question}")
+    result = await answer(args.question, deps)
+    await client.close()
+
+    print(f"\nAnswer ({result.mode}):")
+    print(f"  {result.answer}\n")
+    if result.citations:
+        print("Citations:")
+        for c in result.citations:
+            print(f"  - {c}")
+    print(f"\nMetrics: TTFT={result.first_token_ms}ms, Total={result.total_ms}ms, Tokens In/Out={result.tokens_in}/{result.tokens_out}")
+
+
+if __name__ == "__main__":
+    asyncio.run(cli_main())
