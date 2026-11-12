@@ -51,49 +51,22 @@ python -m retrieval.search "What is the formula for scaled dot product attention
 
 ## Architecture
 
-```text
-               +-------------------------------------------+
-               | User Question                             |
-               +-------------------------------------------+
-                                     |
-                                     v
-                        [ 1. Admit Stage ]
-                       pipeline/limits.py
-                   - In-memory cache hit?
-                   - Token buckets (RPM, TPM)
-                   - In-flight semaphore
-                   - Daily budget exhausted?
-                        /                         \
-           (Throttled / Exhausted)           (Admitted)
-                      /                             \
-                     v                               v
-         [ Extractive / Daily Fallback ]    [ 2. Retrieve Stage ]
-               pipeline/fallback.py          retrieval/search.py
-                                            - BM25 Okapi top-k
-                                            - Absence threshold check
-                                                    /         \
-                                        (No passages)     (Passages found)
-                                                /                 \
-                                               v                   v
-                                      [ Explicit Refusal ]  [ 3. Generate Stage ]
-                                     "The papers do not say"  pipeline/pipeline.py
-                                                              - Shared httpx client
-                                                              - [P1]..[Pk] prompt tags
-                                                              - TTFT & usage logging
-                                                              - llm/retry.py on error
-                                                                       |
-                                                                       v
-                                                            [ 4. Verify & Repair ]
-                                                              pipeline/verify.py
-                                                              - Verify [Pi] citations
-                                                              - Targeted repair prompt
-                                                                       |
-                                                                       v
-                                                            [ 5. Respond Stage ]
-                                                              pipeline/pipeline.py
-                                                              - Formatted response
-                                                              - Cache answer
-                                                              - Execution trace
+```mermaid
+flowchart TD
+    Q["User Question"] --> A["1. Admit Stage (pipeline/limits.py)<br/>• Semantic cache check<br/>• Token buckets (RPM, TPM)<br/>• Concurrency semaphore<br/>• Daily quota check"]
+
+    A -->|"Throttled / Quota Exhausted"| FB["Extractive Fallback (pipeline/fallback.py)<br/>• Top BM25 snippets<br/>• Disclaimer banner"]
+    A -->|"Admitted"| R["2. Retrieve Stage (retrieval/search.py)<br/>• BM25 Okapi top-k chunks<br/>• Absence threshold check"]
+
+    R -->|"Relevance Below Threshold"| REF["Explicit Refusal<br/>'The papers do not say.'"]
+    R -->|"Passages Found"| G["3. Generate Stage (pipeline/pipeline.py)<br/>• Stream with [P1]..[Pk] tags<br/>• TTFT & usage tracking<br/>• Exponential backoff on 429"]
+
+    G --> V["4. Verify & Repair (pipeline/verify.py)<br/>• Validate [Pi] citation tags<br/>• 1-shot targeted repair turn"]
+
+    V -->|"Verified"| RESP["5. Respond Stage (pipeline/pipeline.py)<br/>• Structured answer & citations<br/>• Complete execution trace<br/>• Update cache"]
+    V -->|"Repair Failed"| REF
+    FB --> RESP
+    REF --> RESP
 ```
 
 - **Admit Stage ([`pipeline/limits.py`](pipeline/limits.py)):** Checks semantic cache and evaluates token-bucket capacity (30 RPM, 14,400 TPM, daily token/request ceilings) and concurrency semaphore before admitting requests. Throttled requests gracefully degrade to extractive fallbacks or cached answers rather than failing unhandled.
@@ -140,7 +113,7 @@ A comprehensive analysis of how the mock inference service differs from the real
 Summary of differences:
 1. **Network Jitter:** The stand-in runs in-process with zero network overhead, whereas real Groq calls traverse TLS and edge proxies.
 2. **Deterministic Heuristics:** The stand-in emits deterministic grounded answers and negative refusals to enable reproducible unit test assertions.
-3. **Queue Model:** The stand-in models queuing via an empirical load equation: $\text{TTFT} = \text{base} \times (1 + \alpha \cdot \max(0, \text{in\_flight} - \text{knee})^\beta)$, whereas real datacenter latency spikes depend on multi-tenant hardware contention.
+3. **Queue Model:** The stand-in models queuing via an empirical load equation: $\text{TTFT} = \text{base} \times (1 + \alpha \cdot \max(0, \text{in-flight} - \text{knee})^\beta)$, whereas real datacenter latency spikes depend on multi-tenant hardware contention.
 
 ## Repository Layout
 

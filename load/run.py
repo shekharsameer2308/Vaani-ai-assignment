@@ -200,7 +200,7 @@ async def run_scenario(
                 "tokens_in": 0,
                 "tokens_out": 0,
                 "retrieval_setting": retrieval_setting,
-                "answer_grade": "refused_incorrectly",
+                "answer_grade": "refused_wrongly",
             })
 
     tasks = []
@@ -242,7 +242,7 @@ async def run_scenario(
 async def main():
     parser = argparse.ArgumentParser(description="Load generator and scenario runner.")
     parser.add_argument("--scenario", choices=["steady", "burst", "sustained_overload", "rpm_halved", "daily_exhausted", "all"], default="all")
-    parser.add_argument("--source", choices=["standin", "groq"], default="standin")
+    parser.add_argument("--source", choices=["stand-in", "real", "standin", "groq"], default="stand-in")
     parser.add_argument("--retrieval-setting", choices=["setting_a", "setting_b", "setting_c"], default="setting_a")
     parser.add_argument("--dry-run", action="store_true", help="Run 5 requests only without modifying records.")
     parser.add_argument("--scenarios-file", default="load/scenarios.yaml")

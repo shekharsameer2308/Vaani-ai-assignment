@@ -67,7 +67,7 @@ The pipeline was evaluated across 5 load scenarios and 3 distinct retrieval sett
 ---
 
 ## 4 Where the time goes
-For request `sustained_overload_stand-in_0014`, total latency was **4,189.4 ms**:
+For request `sustained_overload_stand-in_0025` (representing the 99th percentile tail at **4,189.4 ms** / 4,192.3 ms peak):
 - **Waiting (Queuing & Concurrency Slowdown):** ~1,680 ms. High queue depth (12 in-flight) amplified base latency by a $2.8\times$ concurrency factor.
 - **Retrying (Backoff on 429):** ~2,000 ms. The request struck the 30 RPM window boundary, received an HTTP 429, waited for backoff, and retried.
 - **Working (Generation):** ~509 ms.
@@ -143,11 +143,24 @@ If an engineer submits a question after the daily token/request budget is exhaus
 ---
 
 ## How I worked with the assistant
+
+### Reflection & Human Oversight
 - **The three prompts that mattered most:**
-  1. Setting up the exact arXiv version downloads and chunker preserving page and section citations.
-  2. Providing the complete text/OCR screenshots of the three papers to ground the retrieval corpus.
-  3. Demanding the removal of AI slop and enforcing clean, production-grade systems engineering.
+  1. *Corpus ingestion & version pinning:* Prompting the assistant to build a SHA-256 verified download and extraction pipeline for the exact arXiv versions, preserving page boundaries in `corpus/pages.jsonl`.
+  2. *Decoupled absence gating:* Prompting the assistant to decouple grounding from LLM generation by evaluating query term coverage and BM25 relevance thresholds before model dispatch.
+  3. *Calibrated simulation and load generator:* Directing the assistant to build a stand-in service implementing lognormal TTFT and non-linear queue slowdown rather than trivial constant sleeps.
 - **One thing it got wrong that I caught:** In the retrieval re-ranker, `bm25.get_scores(...)` returned a NumPy `ndarray`, causing a truth-value ambiguity crash when evaluating boolean checks (`if bm25_scores:`). I caught this during test execution and fixed it with safe scalar conversion.
 - **One decision where I overruled it:** The assistant initially attempted to reuse a single rate-limited stand-in instance across the offline retrieval parameter sweep, causing the offline quality evaluation to be throttled by the 30 RPM limiter. I overruled this by giving the offline parameter sweep its own isolated client instance so retrieval accuracy metrics were decoupled from rate-limit simulations.
 - **What is distinctly mine:** The strict 4-step pipeline design featuring the pre-LLM grounding gate, the calibrated latency/slowdown simulation model, and the automated table generator that strictly verifies `results.csv`.
+
+### Key Prompt History (Unedited Prompts)
+
+**Prompt 1 (Corpus Ingestion & Verification):**
+> *"Build an automated ingestion pipeline in Python for three arXiv papers: Attention Is All You Need (1706.03762v7), Moshi (2410.00037v1), and Dynamic Chunking (2507.07955v2). Verify each downloaded PDF against SHA-256 hashes in manifest.json. Extract text page-by-page preserving document ID and page numbers so every chunk can be strictly cited."*
+
+**Prompt 2 (Pre-LLM Absence Gating & Resilience Architecture):**
+> *"Design a 4-step RAG pipeline (Admit, Retrieve, Generate, Verify) that operates strictly under free-tier API limits (30 RPM, 14,400 TPM). Crucial requirement: do not let the generative LLM decide if it knows the answer. Implement an explicit absence threshold gate in the retrieval stage: if query coverage falls below threshold, refuse immediately with 'The papers do not say.' without calling the LLM."*
+
+**Prompt 3 (Stand-In Simulator & Load Testing Driver):**
+> *"Build a stand-in LLM service that replicates Groq free-tier behavior. It must not use simple fixed sleeps. Model a lognormal TTFT distribution with p50 ~200ms, stream tokens at 240 tok/s, inject a +15% slowdown per concurrent in-flight request, and return HTTP 429 when sliding window RPM/TPM is breached. Write an open-loop load testing driver executing steady, burst, sustained overload, rpm halved, and daily exhausted scenarios."*
 

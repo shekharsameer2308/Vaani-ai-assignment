@@ -1,38 +1,30 @@
 # Performance & Grounding Analysis Tables
 
-### Table 1: Load Shape Comparison Across Traffic Scenarios
+### Table 2a: Latency, one row per load scenario
 
-| Scenario | Total Reqs | Throughput (req/s) | p50 TTFT (ms) | p95 TTFT (ms) | p99 TTFT (ms) | Error Rate | Fallback Rate | Est. Cost (USD) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `steady` | 42 | 0.17 | 15.5 | 5069.1 | 5075.8 | 4.8% | 23.8% | $0.00291 |
-| `burst` | 30 | 2.56 | 0.0 | 12.4 | 13.6 | 0.0% | 40.0% | $0.00014 |
-| `sustained_overload` | 26 | 2.76 | 0.0 | 0.0 | 0.0 | 0.0% | 30.8% | $0.00007 |
-| `rpm_halved` | 12 | 1.31 | 0.0 | 0.0 | 0.0 | 0.0% | 25.0% | $0.00003 |
-| `daily_exhausted` | 12 | 1.63 | 0.0 | 0.0 | 0.0 | 0.0% | 25.0% | $0.00003 |
+| Scenario | Real or stand-in | Requests sent | Duration (s) | Offered rate (per min) | First token p50 / p95 / p99 (ms) | Total time p50 / p95 / p99 (ms) |
+|---|---|---|---|---|---|---|
+| steady | stand-in | 20 | 6.5 | 184.6 | 312.9 / 921.4 / 1147.4 | 121.7 / 316.5 / 317.3 |
+| burst | stand-in | 25 | 2.1 | 714.3 | 445.2 / 1055.9 / 1115.8 | 159.1 / 862.4 / 1049.8 |
+| sustained_overload | stand-in | 40 | 4.8 | 500.0 | 519.0 / 4180.9 / 4189.4 | 388.5 / 4180.9 / 4189.4 |
+| per_minute_limit_halved | stand-in | 20 | 3.7 | 324.3 | 366.2 / 2157.3 / 2159.3 | 379.8 / 2157.3 / 2159.3 |
+| daily_budget_exhausted | stand-in | 15 | 1.0 | 900.0 | 1.0 / 2.3 / 2.4 | 1.0 / 2.3 / 2.4 |
 
-### Table 2a: Cost & Latency by Retrieval Setting
+### Table 2b: Outcomes, same rows
 
-| Retrieval Setting | N | Mean Prompt Tokens | Mean Output Tokens | p50 TTFT (ms) | p95 TTFT (ms) | p50 Total (ms) | Cost / Req (USD) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `setting_a` | 93 | 125 | 24 | 0.0 | 13.6 | 0.0 | $0.000008 |
-| `setting_b` | 15 | 1129 | 289 | 32.3 | 5075.6 | 818.1 | $0.000080 |
-| `setting_c` | 14 | 1175 | 376 | 5064.8 | 5075.8 | 5057.0 | $0.000089 |
+| Scenario | Succeeded % | Rate-limited % | Timed out or given up % | Retries per request | Peak queue length | Tokens per answer | Cost per 1,000 answers |
+|---|---|---|---|---|---|---|---|
+| steady | 55.0% | 45.0% | 0.0% | 1.40 | 1 | 480.2 | $0.00 (Free Tier) |
+| burst | 84.0% | 16.0% | 0.0% | 0.52 | 10 | 589.7 | $0.00 (Free Tier) |
+| sustained_overload | 62.5% | 37.5% | 0.0% | 1.12 | 12 | 498.0 | $0.00 (Free Tier) |
+| per_minute_limit_halved | 60.0% | 40.0% | 0.0% | 1.20 | 6 | 484.9 | $0.00 (Free Tier) |
+| daily_budget_exhausted | 26.7% | 73.3% | 0.0% | 0.00 | 1 | 17.0 | $0.00 (Free Tier) |
 
-### Table 2b: Retrieval Quality & Grounding by Setting
+### Table 3: Retrieval settings (at least three)
 
-| Retrieval Setting | N | Correct Citations | Correct Refusals | Hallucinations | False Refusals | Overall Grounding Accuracy |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `setting_a` | 93 | 8 | 30 | 0 | 55 | 40.9% |
-| `setting_b` | 15 | 8 | 2 | 4 | 1 | 66.7% |
-| `setting_c` | 14 | 8 | 2 | 3 | 1 | 71.4% |
-
-### Table 3: Fallback and Degradation Behavior Under Stress
-
-| Scenario | Total Invocations | Direct LLM (OK) | Rate-Limited Fallbacks | Unhandled Errors | Total Retries Executed |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `steady` | 42 | 40 | 2 | 0 | 0 |
-| `burst` | 30 | 30 | 0 | 0 | 0 |
-| `sustained_overload` | 26 | 26 | 0 | 0 | 0 |
-| `rpm_halved` | 12 | 12 | 0 | 0 | 0 |
-| `daily_exhausted` | 12 | 12 | 0 | 0 | 0 |
+| Setting (piece size, pieces fetched, re-rank yes or no) | Questions asked | Correct and cited % | Wrong % | Correctly refused % | Tokens per answer | First token p50 / p95 (ms) | Total time p50 / p95 (ms) |
+|---|---|---|---|---|---|---|---|
+| 250 words, top-3, no re-rank | 15 | 80.0% | 0.0% | 20.0% | 485.1 | 205.0 / 473.4 | 52.0 / 66.7 |
+| 500 words, top-5, no re-rank | 15 | 80.0% | 0.0% | 20.0% | 663.9 | 205.2 / 253.7 | 63.2 / 96.7 |
+| 500 words, top-10, re-rank yes | 15 | 73.3% | 0.0% | 20.0% | 691.4 | 235.1 / 1086.1 | 67.5 / 120.6 |
 

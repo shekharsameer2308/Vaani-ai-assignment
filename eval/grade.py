@@ -8,8 +8,8 @@ Evaluates pipeline answers across 3 retrieval settings:
 Grades each answer:
 - correct: answerable question answered with citations matching gold page/paper
 - refused_correctly: unanswerable question refused without hallucination
-- hallucinated: unanswerable question received an answer asserting facts
-- refused_incorrectly: answerable question was refused falsely
+- wrong: unanswerable question received an answer asserting facts, or incorrect citations
+- refused_wrongly: answerable question was refused falsely
 """
 
 import argparse
@@ -49,10 +49,10 @@ def grade_response(q: Dict, answer_text: str, citations: List[str]) -> str:
         if is_refusal:
             return "refused_correctly"
         else:
-            return "hallucinated"
+            return "wrong"
     else:  # answerable
         if is_refusal:
-            return "refused_incorrectly"
+            return "refused_wrongly"
 
         gold_paper = q.get("gold_paper")
         gold_page = q.get("gold_page")
@@ -81,7 +81,7 @@ def grade_response(q: Dict, answer_text: str, citations: List[str]) -> str:
                 else:
                     matched_gold = True
 
-        return "correct" if matched_gold else "refused_incorrectly"
+        return "correct" if matched_gold else "refused_wrongly"
 
 
 async def evaluate_setting(

@@ -6,7 +6,7 @@ This directory provides the calibrated mock/stand-in model service simulating Gr
 
 1. `standin/config.yaml`: Defines simulation parameters including lognormal TTFT fit ($\mu, \sigma$), token streaming rate, sliding-window rate limit ceilings, load curve parameters, fault probabilities, and deterministic seed.
 2. `standin/simulator.py`: Implements queuing math, token buckets, lognormal sampling, and progressive slowdown under concurrency:
-   $$\text{TTFT}_{\text{effective}} = \text{TTFT}_{\text{base}} \times \left(1 + \alpha \cdot \max(0, \text{in\_flight} - \text{knee})^\beta\right)$$
+   $$\text{TTFT}_{\text{effective}} = \text{TTFT}_{\text{base}} \times \left(1 + \alpha \cdot \max(0, \text{in-flight} - \text{knee})^\beta\right)$$
 3. `standin/app.py`: Client interface (`StandInLLMClient`) offering identical signature to `GroqAsyncClient.stream_chat(...)`, returning `StreamResponse` with exact token counts, statuses, and timing headers.
 
 ## Differences Between Stand-in Service and Real Groq API
