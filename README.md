@@ -18,8 +18,8 @@ Follow these steps to set up the environment, verify the papers, build the retri
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/shekharsameer2308/Vaani-ai-assignment.git
-cd Vaani-ai-assignment
+git clone https://github.com/shekharsameer2308/Vaani-ai-assignment..git
+cd "Vaani-ai-assignment."
 
 # 2. Create and activate a Python virtual environment
 python3 -m venv .venv
