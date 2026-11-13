@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import pypdf
 
@@ -200,3 +201,5 @@ subprocess.run(cmd, check=True)
 
 reader = pypdf.PdfReader("submission_2pages.pdf")
 print(f"Generated submission_2pages.pdf: {len(reader.pages)} pages")
+shutil.copyfile("submission_2pages.pdf", "submission.pdf")
+print(f"Copied to submission.pdf: {len(pypdf.PdfReader('submission.pdf').pages)} pages")

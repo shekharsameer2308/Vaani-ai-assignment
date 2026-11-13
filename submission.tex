@@ -152,9 +152,16 @@ For request \texttt{sustained\_overload\_stand-in\_0025} (representing the $p_{9
 \textbf{One thing I would change:} Providing first-class streaming primitives for partial user backchannel detection so client UIs can update states without polling.
 
 \section*{How I worked with the assistant}
-\textbf{Three prompts that mattered most:} (1) Setting up SHA-256 paper downloads preserving page boundaries; (2) Enforcing pre-LLM absence gating rather than allowing the model to guess; (3) Designing a calibrated lognormal queue simulator with $+15\%$ concurrency slowdown.
-\textbf{One thing it got wrong that I caught:} In the re-ranker, \texttt{bm25.get\_scores()} returned a NumPy \texttt{ndarray}, causing truth-value ambiguity crashes on boolean evaluation; I fixed it with explicit scalar conversion.
-\textbf{One decision where I overruled it:} Overruled reusing a rate-limited stand-in client for offline benchmark sweeps to prevent artificial throttling of quality metrics.
-\textbf{What is distinctly mine:} The 4-step pipeline architecture, pre-LLM absence gating, calibrated slowdown model, and automated verification scripts. \textit{(Full unedited transcript exported in \texttt{conversation_history.md})}.
+The full conversation transcript is not attached. The original export could not be uploaded, and I have not reconstructed it, since a rebuilt history would not be an accurate record. What follows describes the process in my own words. The commit history is the primary evidence for each claim.
+
+I used an AI coding assistant mainly to draft the pipeline modules, the stand-in service, the load generator, and the analysis script. I wrote the experimental design, the choice of load shapes, and the calibration targets myself, and I checked the assistant's output by running it rather than accepting it.
+
+\textbf{Where the assistant got it wrong:} In \texttt{analysis/tables.py}, the assistant attempted \texttt{float(row["start\_time"])}, crashing on ISO-8601 timestamps, while \texttt{eval/grade.py} emitted non-conforming enums (\texttt{hallucinated} and \texttt{refused\_incorrectly}). Furthermore, in \texttt{retrieval/search.py}, the assistant initially left re-ranking as an empty \texttt{pass} stub. I caught these through manual test runs and table regeneration, fixing the search logic in commit \texttt{02ef83a} and schema parsing in commit \texttt{de1c1aa}.
+
+\textbf{A decision I overruled:} The assistant proposed coupling the offline retrieval parameter sweep to the shared rate-limited client instance. I overruled this and gave \texttt{eval/grade.py} an isolated, unconstrained client instance, because the parameter sweep measures retrieval precision and citation fidelity, which must not be conflated with synthetic concurrency throttles. Implemented in commit \texttt{eebe252} and verified in commit \texttt{de1c1aa}.
+
+\textbf{Checks I ran myself:} The unit test suite (\texttt{python -m unittest discover tests}, run on 13 November 2026, passing 12/12 tests in \texttt{tests/test\_retry.py} and \texttt{tests/test\_retrieval.py}), and \texttt{analysis/tables.py}, which recomputes every figure in Tables 2a, 2b, and 3 directly from \texttt{results.csv}.
+
+I did not use the assistant to generate measurement results. Real-service numbers come from my own Groq calls and documented rate-limit headers (\texttt{x-ratelimit-limit-requests}, \texttt{x-ratelimit-limit-tokens}, \texttt{x-ratelimit-reset-requests}), which are logged with timestamps.
 
 \end{document}

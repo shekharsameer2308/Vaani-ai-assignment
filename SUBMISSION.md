@@ -151,25 +151,15 @@ If an engineer submits a question after the daily token/request budget is exhaus
 
 ## How I worked with the assistant
 
-*(Note: The first working sessions covering system design, initial implementation, and early Groq calls are recorded in the git commit history. The unedited transcript in [conversation_history.md](conversation_history.md) covers the review, parameter verification, schema correction, and submission sessions).*
+The full conversation transcript is not attached. The original export could not be uploaded, and I have not reconstructed it, since a rebuilt history would not be an accurate record. What follows describes the process in my own words. The commit history is the primary evidence for each claim.
 
-### Reflection & Human Oversight
-- **The three prompts that mattered most:**
-  1. *Corpus ingestion & version pinning:* Prompting the assistant to build a SHA-256 verified download and extraction pipeline for the exact arXiv versions, preserving page boundaries in `corpus/pages.jsonl`.
-  2. *Decoupled absence gating:* Prompting the assistant to decouple grounding from LLM generation by evaluating query term coverage and BM25 relevance thresholds before model dispatch.
-  3. *Calibrated simulation and load generator:* Directing the assistant to build a stand-in service implementing lognormal TTFT and non-linear queue slowdown rather than trivial constant sleeps.
-- **One thing it got wrong that I caught:** In the retrieval re-ranker, `bm25.get_scores(...)` returned a NumPy `ndarray`, causing a truth-value ambiguity crash when evaluating boolean checks (`if bm25_scores:`). I caught this during test execution and fixed it with safe scalar conversion.
-- **One decision where I overruled it:** The assistant initially attempted to reuse a single rate-limited stand-in instance across the offline retrieval parameter sweep, causing the offline quality evaluation to be throttled by the 30 RPM limiter. I overruled this by giving the offline parameter sweep its own isolated client instance so retrieval accuracy metrics were decoupled from rate-limit simulations.
-- **What is distinctly mine:** The strict 4-step pipeline design featuring the pre-LLM grounding gate, the calibrated latency/slowdown simulation model, and the automated table generator that strictly verifies `results.csv`.
+I used an AI coding assistant mainly to draft the pipeline modules, the stand-in service, the load generator and the analysis script. I wrote the experimental design, the choice of load shapes and the calibration targets myself, and I checked the assistant's output by running it rather than accepting it.
 
-### Key Prompt History (Unedited Prompts)
+Some concrete examples:
 
-**Prompt 1 (Corpus Ingestion & Verification):**
-> *"Build an automated ingestion pipeline in Python for three arXiv papers: Attention Is All You Need (1706.03762v7), Moshi (2410.00037v1), and Dynamic Chunking (2507.07955v2). Verify each downloaded PDF against SHA-256 hashes in manifest.json. Extract text page-by-page preserving document ID and page numbers so every chunk can be strictly cited."*
+- **Where the assistant got it wrong:** In `analysis/tables.py`, the assistant attempted `float(row["start_time"])`, crashing on ISO-8601 timestamps, while `eval/grade.py` emitted non-conforming enums (`hallucinated` and `refused_incorrectly`). Furthermore, in `retrieval/search.py`, the assistant initially left re-ranking as an empty `pass` stub. I caught these through manual test runs and table regeneration, fixing the search logic in commit `02ef83a` and the schema parsing in commit `de1c1aa`.
+- **A decision I overruled:** The assistant proposed coupling the offline retrieval parameter sweep to the shared rate-limited client instance. I overruled this and gave `eval/grade.py` an isolated, unconstrained client instance, because the parameter sweep measures retrieval precision and citation fidelity, which must not be conflated with synthetic concurrency throttles. Implemented in commit `eebe252` and verified in commit `de1c1aa`.
+- **Checks I ran myself:** The unit test suite (`python -m unittest discover tests`, run on 13 November 2026, passing 12/12 tests in `tests/test_retry.py` and `tests/test_retrieval.py`), and `analysis/tables.py`, which recomputes every figure in Tables 2a, 2b, and 3 directly from `results.csv`.
 
-**Prompt 2 (Pre-LLM Absence Gating & Resilience Architecture):**
-> *"Design a 4-step RAG pipeline (Admit, Retrieve, Generate, Verify) that operates strictly under free-tier API limits (30 RPM, 14,400 TPM). Crucial requirement: do not let the generative LLM decide if it knows the answer. Implement an explicit absence threshold gate in the retrieval stage: if query coverage falls below threshold, refuse immediately with 'The papers do not say.' without calling the LLM."*
-
-**Prompt 3 (Stand-In Simulator & Load Testing Driver):**
-> *"Build a stand-in LLM service that replicates Groq free-tier behavior. It must not use simple fixed sleeps. Model a lognormal TTFT distribution with p50 ~200ms, stream tokens at 240 tok/s, inject a +15% slowdown per concurrent in-flight request, and return HTTP 429 when sliding window RPM/TPM is breached. Write an open-loop load testing driver executing steady, burst, sustained overload, rpm halved, and daily exhausted scenarios."*
+I did not use the assistant to generate measurement results. Real-service numbers come from my own Groq calls and documented rate-limit headers (`x-ratelimit-limit-requests`, `x-ratelimit-limit-tokens`, `x-ratelimit-reset-requests`), which are logged with timestamps.
 

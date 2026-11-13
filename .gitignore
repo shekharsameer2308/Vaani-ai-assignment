@@ -34,6 +34,7 @@ logs/
 data/*.pkl
 data/*.faiss
 *.pkl
+submission_2pages.html
 
 # ---- Papers: PDFs are fetched by scripts/fetch_papers.py ----
 # manifest.json (with sha256) stays tracked so the fetch can be verified.
