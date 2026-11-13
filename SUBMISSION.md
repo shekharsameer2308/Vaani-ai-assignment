@@ -151,6 +151,8 @@ If an engineer submits a question after the daily token/request budget is exhaus
 
 ## How I worked with the assistant
 
+*(Note: The first working sessions covering system design, initial implementation, and early Groq calls are recorded in the git commit history. The unedited transcript in [conversation_history.md](conversation_history.md) covers the review, parameter verification, schema correction, and submission sessions).*
+
 ### Reflection & Human Oversight
 - **The three prompts that mattered most:**
   1. *Corpus ingestion & version pinning:* Prompting the assistant to build a SHA-256 verified download and extraction pipeline for the exact arXiv versions, preserving page boundaries in `corpus/pages.jsonl`.

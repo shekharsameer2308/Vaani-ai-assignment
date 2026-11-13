@@ -14,8 +14,7 @@ with open(transcript_path, "r", encoding="utf-8") as f:
 lines = []
 lines.append("# Unedited Conversation History with Assistant\n")
 lines.append("> **Note on Development & Audit History:**")
-lines.append("> The initial system implementation and experimental runs were developed using working notes and prompt iterations preserved in git history.")
-lines.append("> Below is the complete, unedited transcript of the subsequent review, parameter verification, schema correction, and final submission validation session.\n")
+lines.append("> The first working sessions (system design, initial implementation and early Groq calls) are not in this export. Their decisions are recorded in the git commit history. The transcript below covers the review, parameter verification, schema correction and submission sessions, unedited.\n")
 lines.append("---\n")
 
 turn = 1
