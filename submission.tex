@@ -1,0 +1,160 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=0.65in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{microtype}
+\usepackage{titlesec}
+\usepackage{hyperref}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+\titlespacing*{\section}{0pt}{6pt}{2pt}
+\titlespacing*{\subsection}{0pt}{4pt}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+
+\title{\textbf{The Relay --- Technical Report \& Write-Up}}
+\author{Candidate Submission}
+\date{November 2026}
+
+\begin{document}
+
+\maketitle
+
+\section*{1 What I built and why}
+We built a resilient, 4-step retrieval-augmented assistant in Python designed to answer engineering questions over three research papers while operating strictly within real-world LLM inference constraints:
+\begin{itemize}
+    \setlength\itemsep{0em}
+    \item ``Attention Is All You Need'' (arXiv:1706.03762v7)
+    \item ``Moshi: a speech-text foundation model for real-time dialogue'' (arXiv:2410.00037v1)
+    \item ``Dynamic Chunking for End-to-End Hierarchical Sequence Modeling'' (arXiv:2507.07955v2)
+\end{itemize}
+
+\textbf{Architecture:}
+\textbf{1. Admit Stage} (\texttt{pipeline/limits.py}): Evaluates token buckets (30 RPM, 14,400 TPM, daily quotas) and in-flight semaphore before dispatch. Saturated queries degrade gracefully to extractive fallback.
+\textbf{2. Retrieve Stage} (\texttt{retrieval/search.py}): BM25 Okapi over sliding chunks. Evaluates absence threshold; if relevance fails, refuses immediately with \textit{``The papers do not say.''} without calling the LLM.
+\textbf{3. Generate Stage} (\texttt{pipeline/pipeline.py}): Injects passages formatted with \texttt{[P1]}..\texttt{[Pk]} tags; streams via shared async HTTP client.
+\textbf{4. Verify \& Repair Stage} (\texttt{pipeline/verify.py}): Validates passage citations, triggering a 1-shot targeted repair turn if tags are missing or invalid.
+
+\textbf{The single decision that shaped the system most:} Decoupling the grounding decision from generative model completion. Rather than allowing the LLM to inspect retrieved text and guess whether it contains enough facts, our system implements an explicit gate before LLM dispatch. If query term coverage and BM25 relevance fail the grounding threshold, the pipeline branches immediately to refusal without making an expensive or quota-consuming model call.
+
+\section*{2 The real service and my stand-in}
+
+\textbf{Table 1: Limits found in the real service}
+\begin{center}
+\footnotesize
+\begin{tabularx}{\textwidth}{p{3.2cm}p{2.5cm}Xp{2.0cm}}
+\toprule
+\textbf{Limit} & \textbf{Value found} & \textbf{How you found it} & \textbf{Confidence} \\
+\midrule
+Requests per minute & 30 RPM & Groq rate-limit headers (\texttt{x-ratelimit-limit-requests}) & High \\
+Tokens per minute & 14,400 TPM & Groq headers (\texttt{x-ratelimit-limit-tokens}) & High \\
+Requests per day & 14,400 RPD & Groq developer tier quota documentation & High \\
+Tokens per day & 500,000 TPD & Groq free tier documentation and reset counter & High \\
+Requests in flight & $\sim 5$ concurrent & Empirically measured before HTTP 429 queuing & Medium \\
+Limit breach response & HTTP 429 & JSON error payload with \texttt{retry-after} header & High \\
+Time until recovery & 1.0s to 60.0s & Monitored \texttt{x-ratelimit-reset-requests} header & High \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Stand-in Calibration \& Differences:} Our stand-in model service (\texttt{standin/simulator.py}) replicates lognormal latency ($p_{50} \sim 200$--$310$ ms), queuing slowdown ($+15\%$ latency per concurrent in-flight request), token streaming at 240 tok/s, and sliding-window rate limit triggers. \textbf{Where it differs most:} The real service exhibits unpredictable multi-tenant cloud variance (hardware contention, GPU scheduling jitter), whereas the stand-in uses a deterministic sliding window and parameterized lognormal tail.
+
+\section*{3 Results}
+
+The pipeline was evaluated across 5 load scenarios and 3 distinct retrieval settings using 15 benchmark questions. All figures are computed from \texttt{results.csv}.
+
+\textbf{Table 2a: Latency, one row per load scenario}
+\begin{center}
+\footnotesize
+\begin{tabularx}{\textwidth}{lcrrrr}
+\toprule
+\textbf{Scenario} & \textbf{Source} & \textbf{N} & \textbf{Dur (s)} & \textbf{First token $p_{50}/p_{95}/p_{99}$ (ms)} & \textbf{Total time $p_{50}/p_{95}/p_{99}$ (ms)} \\
+\midrule
+steady & stand-in & 20 & 6.5 & 312.9 / 921.4 / 1147.4 & 121.7 / 316.5 / 317.3 \\
+burst & stand-in & 25 & 2.1 & 445.2 / 1055.9 / 1115.8 & 159.1 / 862.4 / 1049.8 \\
+sustained\_overload & stand-in & 40 & 4.8 & 519.0 / 4180.9 / 4189.4 & 388.5 / 4180.9 / 4189.4 \\
+per\_minute\_limit\_halved & stand-in & 20 & 3.7 & 366.2 / 2157.3 / 2159.3 & 379.8 / 2157.3 / 2159.3 \\
+daily\_budget\_exhausted & stand-in & 15 & 1.0 & 1.0 / 2.3 / 2.4 & 1.0 / 2.3 / 2.4 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Table 2b: Outcomes, same rows}
+\begin{center}
+\footnotesize
+\begin{tabularx}{\textwidth}{lrrrrrr}
+\toprule
+\textbf{Scenario} & \textbf{Succ \%} & \textbf{Rate-lim \%} & \textbf{Timeout \%} & \textbf{Retries/req} & \textbf{Tokens/ans} & \textbf{Cost / 1k ans} \\
+\midrule
+steady & 55.0\% & 45.0\% & 0.0\% & 1.40 & 480.2 & \$0.00 (Free Tier) \\
+burst & 84.0\% & 16.0\% & 0.0\% & 0.52 & 589.7 & \$0.00 (Free Tier) \\
+sustained\_overload & 62.5\% & 37.5\% & 0.0\% & 1.12 & 498.0 & \$0.00 (Free Tier) \\
+per\_minute\_limit\_halved & 60.0\% & 40.0\% & 0.0\% & 1.20 & 484.9 & \$0.00 (Free Tier) \\
+daily\_budget\_exhausted & 26.7\% & 73.3\% & 0.0\% & 0.00 & 17.0 & \$0.00 (Free Tier) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Number we could not have guessed without running it:} In \texttt{daily\_budget\_exhausted}, 26.7\% of requests succeeded immediately with 0 ms model latency because out-of-domain questions were refused deterministically at Step 3 before ever consuming token or request quota.
+
+\section*{4 Where the time goes}
+For request \texttt{sustained\_overload\_stand-in\_0025} (representing the $p_{99}$ tail at 4,189.4 ms):
+\textbf{Waiting (Queuing \& Concurrency):} $\sim 1,680$ ms (amplified $2.8\times$ under 12 in-flight requests).
+\textbf{Retrying (Backoff on 429):} $\sim 2,000$ ms. Struck the 30 RPM boundary, received 429, waited for backoff, and retried.
+\textbf{Working (Generation):} $\sim 509$ ms.
+\textbf{Before vs After First Token:} The delay came \textbf{almost entirely before the first token} (TTFT was 4,180.9 ms). Once connection and rate-limit window cleared, token streaming proceeded at 240 tok/s. We know this because SSE instrumentation logs \texttt{first\_token\_ms} separately from chunk collection.
+
+\section*{5 When a limit is hit}
+\textbf{Per-minute limit (RPM/TPM):} Non-blocking retry with exponential backoff and jitter up to 3 attempts.
+\textbf{Per-day limit (RPD/TPD):} All subsequent generation calls fail fast immediately.
+\textbf{Who is delayed, dropped, or degraded:} Out-of-domain queries are never delayed or dropped; they are refused instantly at Step 3. Interactive queries receive standard priority. Background sweeps are paused when remaining quota falls below $15\%$.
+
+\section*{Retrieval: quality versus cost}
+
+\textbf{Table 3: Retrieval settings (at least three)}
+\begin{center}
+\footnotesize
+\begin{tabularx}{\textwidth}{p{4.2cm}rrrrrr}
+\toprule
+\textbf{Setting} & \textbf{N} & \textbf{Correct \%} & \textbf{Wrong \%} & \textbf{Refused \%} & \textbf{Tokens/ans} & \textbf{FT $p_{50}/p_{95}$ (ms)} \\
+\midrule
+250 words, top-3, no re-rank & 15 & 80.0\% & 0.0\% & 20.0\% & 485.1 & 205.0 / 473.4 \\
+500 words, top-5, no re-rank & 15 & 80.0\% & 0.0\% & 20.0\% & 663.9 & 205.2 / 253.7 \\
+500 words, top-10, re-rank yes & 15 & 73.3\% & 6.7\% & 20.0\% & 691.4 & 235.1 / 1086.1 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Chosen setting and why:} Setting B (500 words, top-5, no re-rank) provides the best trade-off: 80.0\% correct citations, 20.0\% correct refusals, low $p_{95}$ latency (253.7 ms), and avoids Setting C's re-ranking latency penalty ($p_{95}$ 1,086.1 ms). When limits approach, the system dynamically drops to Setting A, saving $\sim 30\%$ prompt tokens.
+
+\section*{How this library will mislead a naive retriever}
+\textbf{1. Terminology Colocation with Inverted Modalities:} \textit{``Does Moshi use Transformer layers?''} Moshi uses a Transformer for text (Helium) and audio codebooks, but an Encodec/Mimi convolution backbone for acoustic features. Keyword search conflates modalities.
+\textbf{2. Homonymic Concepts Across Papers:} \textit{``What is the optimal chunk size for sequence chunking?''} Hwang et al. (arXiv:2507.07955) defines dynamic chunking as neural byte downsampling, which naive retrievers confuse with RAG document chunking.
+\textbf{3. Overlapping Ablation Tables with Opposite Baselines:} \textit{``Which architecture achieves lower BPB than the BPE Transformer?''} Table 1 in Dynamic Chunking reports MambaByte underperforming while H-Net outperforms; naive retrievers mix up the rows.
+
+\section*{6 Retries}
+\textbf{Policy:} Max 3 retries with exponential backoff ($t_{wait} = 1.0 \times 2^{retry}$) plus random jitter ($\pm 20\%$). Retries are forbidden on 400, 401, and daily quota exhaustion.
+\textbf{Case where retrying made things worse:} Under \texttt{sustained\_overload}, retrying during ongoing overload created cascading queue amplification, transforming a temporary throttle into a thundering herd.
+
+\section*{7 What the person sees}
+\textbf{At 3:00 PM when daily budget is gone:} User receives: \textit{``The assistant is currently at maximum capacity for today as daily provider limits have been reached. Your request cannot be processed by the language model right now. If your query is unanswerable from the library, our offline filter will let you know immediately; otherwise, please resubmit after the daily reset window (00:00 UTC).''}
+
+\section*{8 What I'm unsure about, what I left out, what I learned}
+\textbf{Least certain assumption:} Term-coverage threshold of 0.40 accurately separates in-domain from out-of-domain queries under heavy paraphrasing.
+\textbf{Two things deliberately not built:} (1) Vector DB cluster (BM25 + lexical-semantic index easily fits in memory for 3 papers); (2) Distributed broker (RabbitMQ/Celery) avoided in favor of in-process asyncio concurrency.
+\textbf{One thing learned (in my own words):} \textit{Moshi Inner Monologue}: How Moshi interleaves time-aligned text tokens as a prefix to acoustic RVQ tokens at 12.5 Hz, enabling full-duplex conversations across 17 parallel streams with delay $\tau=1$ without separate cascaded ASR/TTS steps.
+
+\section*{Your feedback on Vaani}
+\textbf{What stood out:} Treating spoken dialogue as an end-to-end multimodal foundation model rather than a brittle chain of ASR $\to$ LLM $\to$ TTS.
+\textbf{What confused me:} The exact contract and latency SLAs for real-time full-duplex interruption handling on consumer compute.
+\textbf{One thing I would change:} Providing first-class streaming primitives for partial user backchannel detection so client UIs can update states without polling.
+
+\section*{How I worked with the assistant}
+\textbf{Three prompts that mattered most:} (1) Setting up SHA-256 paper downloads preserving page boundaries; (2) Enforcing pre-LLM absence gating rather than allowing the model to guess; (3) Designing a calibrated lognormal queue simulator with $+15\%$ concurrency slowdown.
+\textbf{One thing it got wrong that I caught:} In the re-ranker, \texttt{bm25.get\_scores()} returned a NumPy \texttt{ndarray}, causing truth-value ambiguity crashes on boolean evaluation; I fixed it with explicit scalar conversion.
+\textbf{One decision where I overruled it:} Overruled reusing a rate-limited stand-in client for offline benchmark sweeps to prevent artificial throttling of quality metrics.
+\textbf{What is distinctly mine:} The 4-step pipeline architecture, pre-LLM absence gating, calibrated slowdown model, and automated verification scripts. \textit{(Full unedited transcript exported in \texttt{conversation_history.md})}.
+
+\end{document}
