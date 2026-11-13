@@ -62,7 +62,14 @@ The pipeline was evaluated across 5 load scenarios and 3 distinct retrieval sett
 | per_minute_limit_halved | 60.0% | 40.0% | 0.0% | 1.20 | 6 | 484.9 | $0.00 (Free Tier) |
 | daily_budget_exhausted | 26.7% | 73.3% | 0.0% | 0.00 | 1 | 17.0 | $0.00 (Free Tier) |
 
-**Number we could not have guessed without running it:** In `daily_budget_exhausted`, 26.7% of requests succeeded immediately with 0 ms model latency because the out-of-domain questions were refused deterministically at Step 3 before ever consuming token or request quota.
+### Table 3: Retrieval settings (at least three)
+| Setting (piece size, pieces fetched, re-rank yes or no) | Questions asked | Correct and cited % | Wrong % | Correctly refused % | Tokens per answer | First token p50 / p95 (ms) | Total time p50 / p95 (ms) |
+|---|---|---|---|---|---|---|---|
+| 250 words, top-3, no re-rank | 15 | 80.0% | 0.0% | 20.0% | 485.1 | 205.0 / 473.4 | 52.0 / 66.7 |
+| 500 words, top-5, no re-rank | 15 | 80.0% | 0.0% | 20.0% | 663.9 | 205.2 / 253.7 | 63.2 / 96.7 |
+| 500 words, top-10, re-rank yes | 15 | 73.3% | 6.7% | 20.0% | 691.4 | 235.1 / 1086.1 | 67.5 / 120.6 |
+
+**Number we could not have guessed without running it:** In `daily_budget_exhausted`, 26.7% of requests succeeded immediately with 0 ms model latency because the out-of-domain questions were refused deterministically at Step 3 before ever consuming token or request quota. *(See Section 2 Table 1 for measured limits and 'Retrieval: quality versus cost' for ablation details).*
 
 ---
 
